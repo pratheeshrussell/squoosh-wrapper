@@ -1,0 +1,13 @@
+{
+  "name": "squoosh-lib",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser library wrapper around Squoosh WASM codecs for image encoding, decoding, and processing.",
+  "main": "src/index.js",
+  "scripts": {
+    "setup": "bash scripts/setup-codecs.sh",
+    "serve-example": "npx -y serve@latest -p 8080 --cors ."
+  },
+  "license": "Apache-2.0"
+}

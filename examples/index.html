@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Squoosh Library — Example</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface-hover: #252535;
+      --border: #2a2a3d;
+      --text: #e8e8f0;
+      --text-dim: #8888a0;
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.3);
+      --success: #34d399;
+      --danger: #f87171;
+      --radius: 12px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6c63ff, #a78bfa, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ─── Drop Zone ─── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, var(--accent-glow), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--surface-hover);
+    }
+
+    .drop-zone:hover::before, .drop-zone.drag-over::before {
+      opacity: 1;
+    }
+
+    .drop-zone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone-text {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    .drop-zone-text strong {
+      color: var(--accent);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* ─── Controls ─── */
+    .controls {
+      display: none;
+      margin-top: 1.5rem;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+    }
+
+    .controls.visible { display: block; }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .control-row:last-child { margin-bottom: 0; }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      min-width: 70px;
+    }
+
+    select, input[type="range"] {
+      flex: 1;
+    }
+
+    select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: transform 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .quality-value {
+      min-width: 3ch;
+      text-align: right;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    /* ─── Preview ─── */
+    .preview-section {
+      display: none;
+      margin-top: 1.5rem;
+    }
+
+    .preview-section.visible { display: block; }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .preview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .preview-card img, .preview-card canvas {
+      width: 100%;
+      display: block;
+      object-fit: contain;
+      max-height: 300px;
+      background: repeating-conic-gradient(#1f1f2e 0% 25%, #16161f 0% 50%)
+        50% / 20px 20px;
+    }
+
+    .preview-card img:not([src]), .preview-card img[src=""] {
+      visibility: hidden;
+    }
+
+    .preview-card-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .preview-label {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .preview-size {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .preview-card-body {
+      padding: 0;
+    }
+
+    /* ─── Results Table ─── */
+    .results {
+      display: none;
+      margin-top: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .results.visible { display: block; }
+
+    .results-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .results table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .results th, .results td {
+      padding: 0.6rem 1.25rem;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    .results th {
+      color: var(--text-dim);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results tr:not(:last-child) td {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results .savings {
+      font-weight: 600;
+    }
+
+    .savings.positive { color: var(--success); }
+    .savings.negative { color: var(--danger); }
+
+    .download-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    .download-link:hover { opacity: 0.8; }
+
+    /* ─── Status ─── */
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    .status.visible { display: block; }
+    .status.info { background: rgba(108, 99, 255, 0.1); border: 1px solid rgba(108, 99, 255, 0.3); }
+    .status.success { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .status.error { background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); color: var(--danger); }
+
+    /* ─── Spinner ─── */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .preview-grid { grid-template-columns: 1fr; }
+      .control-row { flex-wrap: wrap; }
+      .btn-group { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Squoosh Library</h1>
+    <p class="subtitle">Compress and convert images using WASM codecs — entirely in your browser.</p>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*">
+      <div class="drop-zone-icon">📁</div>
+      <p class="drop-zone-text">
+        <strong>Click or drop</strong> an image here to get started
+      </p>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls" id="controls">
+      <div class="control-row">
+        <label for="format">Format</label>
+        <select id="format">
+          <option value="mozjpeg">MozJPEG (.jpg)</option>
+          <option value="webp" selected>WebP (.webp)</option>
+          <option value="avif">AVIF (.avif)</option>
+          <option value="png">PNG (.png)</option>
+        </select>
+      </div>
+      <div class="control-row" id="qualityRow">
+        <label for="quality">Quality</label>
+        <input type="range" id="quality" min="1" max="100" value="75">
+        <span class="quality-value" id="qualityValue">75</span>
+      </div>
+      <div class="control-row" id="resizeRow">
+        <label>Resize</label>
+        <label style="min-width: auto;">W</label>
+        <input type="number" id="resizeWidth" placeholder="auto" min="1" style="width: 80px; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 0.4rem; border-radius: 6px; font-family: var(--font);">
+        <label style="min-width: auto;">H</label>
+        <input type="number" id="resizeHeight" placeholder="auto" min="1" style="width: 80px; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 0.4rem; border-radius: 6px; font-family: var(--font);">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="compressBtn" disabled>
+          Compress Image
+        </button>
+        <button class="btn btn-secondary" id="compressAllBtn" disabled>
+          Compress All Formats
+        </button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status" id="status"></div>
+
+    <!-- Preview -->
+    <div class="preview-section" id="previewSection">
+      <div class="preview-grid">
+        <div class="preview-card">
+          <div class="preview-card-header">
+            <span class="preview-label">Original</span>
+            <span class="preview-size" id="originalSize">—</span>
+          </div>
+          <div class="preview-card-body">
+            <canvas id="originalCanvas"></canvas>
+          </div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-card-header">
+            <span class="preview-label" id="outputLabel">Output</span>
+            <span class="preview-size" id="outputSize">—</span>
+          </div>
+          <div class="preview-card-body">
+            <img id="outputPreview" alt="Compressed output">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="results" id="results">
+      <div class="results-header">Compression Results</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Original</th>
+            <th>Compressed</th>
+            <th>Savings</th>
+            <th>Time</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+name: Build Squoosh WASM Codecs
+
+# Builds all Squoosh WASM codecs from source using Docker.
+# The codecs are built inside the same Docker containers used by the original
+# Squoosh project (Emscripten for C/C++, wasm-pack for Rust).
+#
+# Outputs: A zip artifact containing all browser-compatible .js + .wasm files.
+
+on:
+  workflow_dispatch:
+    inputs:
+      squoosh_ref:
+        description: 'Squoosh repo branch, tag, or commit SHA'
+        required: false
+        default: 'dev'
+      squoosh_repo:
+        description: 'Squoosh repo (owner/name)'
+        required: false
+        default: 'GoogleChromeLabs/squoosh'
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Build C/C++ Emscripten codecs ─────────────────────────────────────
+  build-cpp:
+    name: Build ${{ matrix.codec }} (C++)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+      # codec: [mozjpeg, webp, avif, jxl, wp2, qoi, imagequant]
+        codec: [mozjpeg, webp, avif]
+    steps:
+      - name: Checkout squoosh
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.squoosh_repo }}
+          ref: ${{ inputs.squoosh_ref }}
+
+      - name: Fix Docker TTY for CI
+        run: |
+          sed -i 's/-it//g' codecs/build-cpp.sh
+          sed -i 's/-it//g' codecs/build-rust.sh
+
+      - name: Build codec
+        run: |
+          cd codecs/${{ matrix.codec }}
+          npm run build
+
+      - name: Collect browser artifacts
+        run: |
+          mkdir -p output/${{ matrix.codec }}
+          cd codecs/${{ matrix.codec }}
+          # Copy browser JS + WASM + type defs (exclude node variants)
+          find . -maxdepth 3 \( -name "*.js" -o -name "*.wasm" -o -name "*.d.ts" \) \
+            ! -name "*_node_*" \
+            ! -name "package*.json" \
+            ! -path "*/node_modules/*" \
+            -exec cp --parents {} ../../output/${{ matrix.codec }}/ \;
+
+      - name: Upload codec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codec-${{ matrix.codec }}
+          path: output/${{ matrix.codec }}/
+          retention-days: 30
+
+  # ─── Build Rust wasm-bindgen codecs ────────────────────────────────────
+  build-rust:
+    name: Build ${{ matrix.codec }} (Rust)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        codec: [resize, png]
+    steps:
+      - name: Checkout squoosh
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.squoosh_repo }}
+          ref: ${{ inputs.squoosh_ref }}
+
+      - name: Fix Docker TTY for CI
+        run: |
+          sed -i 's/-it//g' codecs/build-cpp.sh
+          sed -i 's/-it//g' codecs/build-rust.sh
+
+      - name: Build codec
+        run: |
+          cd codecs/${{ matrix.codec }}
+          npm run build
+
+      - name: Collect browser artifacts
+        run: |
+          mkdir -p output/${{ matrix.codec }}
+          cd codecs/${{ matrix.codec }}
+          # Copy pkg/ contents for wasm-bindgen codecs
+          if [ -d "pkg" ]; then
+            cp -r pkg/ ../../output/${{ matrix.codec }}/pkg/
+          fi
+          # For rotate, copy the raw .wasm
+          if [ -f "rotate.wasm" ]; then
+            cp rotate.wasm ../../output/${{ matrix.codec }}/
+          fi
+
+      - name: Upload codec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codec-${{ matrix.codec }}
+          path: output/${{ matrix.codec }}/
+          retention-days: 30
+
+  # ─── Package all codecs into a zip ─────────────────────────────────────
+  package:
+    name: Package codecs
+    needs: [build-cpp, build-rust]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all codec artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: codecs/
+          pattern: codec-*
+          merge-multiple: false
+
+      - name: Reorganize
+        run: |
+          mkdir -p final-codecs
+          for dir in codecs/codec-*/; do
+            codec_name=$(basename "$dir" | sed 's/^codec-//')
+            cp -r "$dir" "final-codecs/$codec_name"
+          done
+
+      - name: Upload packaged codecs
+        uses: actions/upload-artifact@v4
+        with:
+          name: squoosh-codecs-${{ inputs.squoosh_ref }}
+          path: final-codecs/
+          retention-days: 90
